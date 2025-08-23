@@ -97,6 +97,9 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
         case 'select':
           setSelectedId(a.id);
           break;
+        case 'replace':
+          current = a.root as EmailNode;
+          break;
       }
     }
     emit(current);

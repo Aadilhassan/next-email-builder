@@ -77,4 +77,5 @@ export type AssistantAction =
   | { type: 'insert'; parentId: NodeId; index?: number; node: EmailNode }
   | { type: 'update'; id: NodeId; props: Partial<BlockProps> }
   | { type: 'remove'; id: NodeId }
-  | { type: 'select'; id?: NodeId };
+  | { type: 'select'; id?: NodeId }
+  | { type: 'replace'; root: EmailNode };
