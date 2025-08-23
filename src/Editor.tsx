@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { Canvas } from './components/Canvas';
-import { Palette } from './components/Palette';
 import { Inspector } from './components/Inspector';
 import { ChatPanel, ChatAdapter } from './chat/ChatPanel';
 // Sidebar removed; left panel will host AI chat
@@ -58,6 +57,28 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
   function add(node: EmailNode) {
     const parentId = selectedId ?? root.id;
     emit(insertNode(root, parentId, node));
+  }
+
+  function insertAfter(targetId: string, node: EmailNode) {
+    // Find parent and index of target, then insert at index+1
+    // Reuse findNode to walk for parent since we have utilities in core for reordering
+    function walk(n: EmailNode, p?: EmailNode): { parent?: EmailNode; index?: number } | undefined {
+      if (!n.children) return undefined;
+      const idx = n.children.findIndex((c) => c.id === targetId);
+      if (idx >= 0) return { parent: n, index: idx };
+      for (const c of n.children) {
+        const r = walk(c, n);
+        if (r) return r;
+      }
+      return undefined;
+    }
+    const info = walk(root);
+    if (info?.parent && info.index !== undefined) {
+      emit(insertNode(root, info.parent.id, node, info.index + 1));
+    } else {
+      // If not found as a sibling, append to root
+      emit(insertNode(root, root.id, node));
+    }
   }
 
   function applyActions(actions: Array<{ type: string; [k: string]: any }>) {
@@ -133,6 +154,7 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
           URL.revokeObjectURL(url);
         }}
         onPreviewWidth={(w) => setStageWidth(w)}
+        activeWidth={stageWidth}
         onUndo={undo}
         onRedo={redo}
       />
@@ -158,8 +180,7 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
               <span className="neb-badge">Blocks</span>
             </div>
           </div>
-          <div className="body" style={{ display: 'grid', gap: 12 }}>
-            <Palette onInsert={add} factories={factories as any} />
+          <div className="body" style={{ display: 'grid' }}>
             <Canvas
               root={root}
               onSelect={setSelectedId}
@@ -168,6 +189,9 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
               onMoveDown={(id) => emit(moveSibling(root, id, +1))}
               onRemove={(id) => emit(removeNode(root, id))}
               mode={mode}
+              factories={factories as any}
+              onInsertAt={(parentId, node, index) => emit(insertNode(root, parentId, node, index))}
+              onInsertAfter={(id, n) => insertAfter(id, n)}
             />
           </div>
         </div>

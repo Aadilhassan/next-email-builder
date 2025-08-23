@@ -767,6 +767,50 @@ const ChatPanel = ({
   });
 };
 
+const PencilIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": "true",
+  children: [jsx("path", {
+    d: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  }), jsx("path", {
+    d: "M14.06 6.19l3.75 3.75 1.65-1.65a1.5 1.5 0 000-2.12l-1.53-1.53a1.5 1.5 0 00-2.12 0l-1.65 1.65z",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  })]
+});
+const EyeIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": "true",
+  children: [jsx("path", {
+    d: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  }), jsx("circle", {
+    cx: "12",
+    cy: "12",
+    r: "3",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  })]
+});
 const Toolbar = ({
   mode,
   onSetMode,
@@ -799,20 +843,37 @@ const Toolbar = ({
           fontSize: 12
         },
         children: "Mode"
-      }), jsx("button", {
-        className: "neb-btn",
-        onClick: () => onSetMode('edit'),
-        style: {
-          outline: mode === 'edit' ? `2px solid var(--accent)` : undefined
-        },
-        children: "Edit"
-      }), jsx("button", {
-        className: "neb-btn",
-        onClick: () => onSetMode('preview'),
-        style: {
-          outline: mode === 'preview' ? `2px solid var(--accent)` : undefined
-        },
-        children: "Preview"
+      }), jsx("div", {
+        className: "neb-switch",
+        role: "group",
+        "aria-label": "Mode switch",
+        children: jsxs("button", {
+          type: "button",
+          className: `neb-switch-track`,
+          role: "switch",
+          "aria-checked": mode === 'preview',
+          "aria-label": mode === 'preview' ? 'Preview' : 'Edit',
+          onClick: () => onSetMode(mode === 'edit' ? 'preview' : 'edit'),
+          children: [jsx("span", {
+            className: `neb-switch-thumb ${mode === 'preview' ? 'right' : 'left'}`
+          }), jsx("span", {
+            className: `neb-switch-icon ${mode === 'edit' ? 'active' : ''}`,
+            onClick: e => {
+              e.stopPropagation();
+              onSetMode('edit');
+            },
+            title: "Edit",
+            children: jsx(PencilIcon, {})
+          }), jsx("span", {
+            className: `neb-switch-icon ${mode === 'preview' ? 'active' : ''}`,
+            onClick: e => {
+              e.stopPropagation();
+              onSetMode('preview');
+            },
+            title: "Preview",
+            children: jsx(EyeIcon, {})
+          })]
+        })
       })]
     }), jsxs("div", {
       className: "group",

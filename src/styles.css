@@ -25,14 +25,17 @@
 .neb-app {
   display: grid;
   grid-template-rows: 52px 1fr;
-  gap: 12px;
+  gap: 0; /* remove gaps between toolbar and panels for a cleaner look */
+  height: 100vh; /* allow internal panels to size and scroll */
+  border: 1px solid var(--border); /* border around whole component */
+  border-radius: var(--radius);
+  overflow: hidden; /* keep rounded corners clean */
 }
 
 .neb-toolbar {
   display: flex; align-items: center; justify-content: space-between;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-bottom: 1px solid var(--border); /* only a bottom border to separate from panels */
   padding: 8px 10px;
 }
 
@@ -48,25 +51,28 @@
 .neb-icon { width: 18px; height: 18px; display: inline-block; }
 
 .neb-shell {
-  display: grid; gap: 12px;
-  grid-template-columns: 260px 1fr 340px;
+  display: grid;
+  grid-template-columns: 320px 1fr 340px;
+  height: 100%;
 }
 
-.neb-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+.neb-panel { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.neb-panel:last-child { border-right: 0; border-left: 1px solid var(--border); }
 .neb-panel .header { padding: 10px; border-bottom: 1px solid var(--border); color: var(--subtle); font-weight: 600; }
-.neb-panel .body { padding: 10px; }
+.neb-panel .body { padding: 12px; flex: 1; min-height: 0; overflow: auto; }
 
 .neb-sidebar .template { padding: 8px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: var(--muted); }
 .neb-sidebar .template:hover { border-color: var(--accent); }
 
-.neb-canvas-wrap { padding: 10px; }
+.neb-canvas-wrap { padding: 16px; height: 100%; box-sizing: border-box; overflow: auto; }
 .neb-canvas {
   background: var(--bg);
-  border-radius: 12px; padding: 24px;
-  display: grid; place-items: center; min-height: 500px;
-  border: 1px dashed var(--border);
+  padding: 16px;
+  display: grid; place-items: center; min-height: 100%;
+  border-top: 1px solid var(--border);
+  position: relative;
 }
-.neb-stage { background: #ffffff; color: #0f172a; width: 100%; max-width: var(--stage-width, 600px); border-radius: 8px; padding: 16px; }
+.neb-stage { background: #ffffff; color: #0f172a; width: 100%; max-width: var(--stage-width, 600px); border: 1px solid var(--border); border-radius: 8px; padding: 16px; box-sizing: border-box; }
 
 .neb-inspector .field { display: grid; gap: 6px; margin-bottom: 10px; }
 .neb-inspector .row { display: flex; gap: 8px; }
@@ -91,3 +97,41 @@
 .neb-preview .neb-node { border-color: transparent; outline: none; }
 .neb-preview .neb-node .label,
 .neb-preview .neb-node .neb-pop { display: none !important; }
+
+/* Add (+) button and block picker */
+.neb-add-wrap { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 900; }
+.neb-add-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--accent); color: #fff; border: 0; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25); cursor: pointer; }
+.neb-picker-wrap { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 1200; }
+.neb-picker { background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.12); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.neb-pick { width: 74px; height: 58px; border-radius: 10px; border: 1px solid var(--border); background: var(--muted); display: grid; place-items: center; gap: 4px; cursor: pointer; }
+.neb-pick .icon { color: var(--subtle); }
+.neb-pick .lbl { font-size: 12px; color: var(--subtle); }
+
+/* Side controls */
+.neb-side-ctrl { position: absolute; left: -46px; top: 16px; background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 6px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 10px 24px rgba(0,0,0,0.08); z-index: 1000; }
+.neb-side-ctrl .ctrl { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--muted); border: 0; border-radius: 999px; color: var(--subtle); cursor: pointer; }
+.neb-side-ctrl .ctrl.danger { color: var(--danger); background: #fff; border: 1px solid var(--border); }
+
+/* Icon switch */
+.neb-switch { display: inline-flex; align-items: center; }
+.neb-switch-track {
+  position: relative; display: inline-flex; align-items: center; gap: 8px;
+  background: var(--muted); border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 10px; cursor: pointer; min-width: 80px; height: 36px;
+}
+.neb-switch-thumb {
+  position: absolute; top: 3px; width: 34px; height: 30px; border-radius: 999px;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  transition: transform 0.2s ease;
+}
+.neb-switch-thumb.left { transform: translateX(4px); }
+.neb-switch-thumb.right { transform: translateX(42px); }
+.neb-switch-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--subtle); }
+.neb-switch-icon.active { color: var(--accent); }
+
+/* Segmented buttons */
+.neb-seg { display: inline-flex; background: var(--muted); border: 1px solid var(--border); border-radius: 10px; padding: 2px; gap: 4px; }
+.neb-seg .seg-btn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--subtle); border-radius: 8px; cursor: pointer; }
+.neb-seg .seg-btn.active { background: #fff; color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+/* (Removed duplicate conflicting hover/picker styles) */
