@@ -1,6 +1,6 @@
 {
   "name": "next-email-builder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Modern drag-and-drop email/newsletter builder with optional AI chat interface for Next.js/React",
   "type": "module",
   "main": "dist/index.cjs",
@@ -22,7 +22,15 @@
     "play:preview": "npm --prefix playground run preview",
     "prepublishOnly": "npm run test && npm run build"
   },
-  "keywords": ["email", "newsletter", "editor", "builder", "drag-and-drop", "react", "nextjs"],
+  "keywords": [
+    "email",
+    "newsletter",
+    "editor",
+    "builder",
+    "drag-and-drop",
+    "react",
+    "nextjs"
+  ],
   "author": "Aadil Hassan",
   "license": "ISC",
   "repository": {
@@ -54,6 +62,8 @@
     "vitest": "^2.0.5",
     "typescript": "^5.9.2"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false
 }
