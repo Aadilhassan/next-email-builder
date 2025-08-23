@@ -19,11 +19,23 @@
     "test": "vitest run",
     "play:dev": "npm --prefix playground run dev",
     "play:build": "npm --prefix playground run build",
-    "play:preview": "npm --prefix playground run preview"
+    "play:preview": "npm --prefix playground run preview",
+    "prepublishOnly": "npm run test && npm run build"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["email", "newsletter", "editor", "builder", "drag-and-drop", "react", "nextjs"],
+  "author": "Aadil Hassan",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aadilhassan/next-email-builder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Aadilhassan/next-email-builder/issues"
+  },
+  "homepage": "https://github.com/Aadilhassan/next-email-builder#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "peerDependencies": {
     "next": "^15.5.0",
     "react": "^19.1.1",

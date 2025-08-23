@@ -5,11 +5,13 @@ node_modules/
 # Build outputs
 dist/
 **/dist/
+playground/dist/
 
 # Logs
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
 
 # Editor/OS
 .DS_Store
@@ -18,3 +20,10 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Env files
+.env
+.env.*
+
+# Tarballs
+*.tgz
