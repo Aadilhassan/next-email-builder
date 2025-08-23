@@ -7,6 +7,13 @@ export default defineConfig({
   resolve: {
     alias: {
       'next-email-builder': path.resolve(__dirname, '../src/index.ts'),
+      'next-email-builder/dist/styles.css': path.resolve(__dirname, '../src/styles.css'),
+    },
+  },
+  server: {
+    fs: {
+      // allow imports from the monorepo root (parent directory)
+      allow: ['..'],
     },
   },
 });

@@ -3,8 +3,10 @@ import { Canvas } from './components/Canvas';
 import { Palette } from './components/Palette';
 import { Inspector } from './components/Inspector';
 import { ChatPanel, ChatAdapter } from './chat/ChatPanel';
+// Sidebar removed; left panel will host AI chat
+import { Toolbar } from './components/Toolbar';
 import { EmailNode } from './types';
-import { createButton, createColumn, createImage, createSection, createSpacer, createText, findNode, insertNode, removeNode, uid, updateNode } from './core';
+import { createButton, createColumn, createImage, createSection, createSpacer, createText, findNode, insertNode, removeNode, updateNode, moveSibling } from './core';
 import { renderToHtml } from './renderers/html';
 
 export type EditorProps = {
@@ -16,12 +18,41 @@ export type EditorProps = {
 export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }) => {
   const [root, setRoot] = useState<EmailNode>(() => initial ?? createSection({}, [createColumn({}, [createText({ content: 'Hello' }), createSpacer(), createButton()])]))
   const [selectedId, setSelectedId] = useState<string | undefined>(root.id);
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  const [undoStack, setUndoStack] = useState<EmailNode[]>([]);
+  const [redoStack, setRedoStack] = useState<EmailNode[]>([]);
 
   const selected = useMemo(() => (selectedId ? findNode(root, selectedId) : undefined), [root, selectedId]);
 
-  function emit(next: EmailNode) {
+  function emit(next: EmailNode, pushHistory: boolean = true) {
+    if (pushHistory) {
+      setUndoStack((s) => [...s, root]);
+      setRedoStack([]);
+    }
     setRoot(next);
     onChange?.(next);
+  }
+
+  function undo() {
+    setUndoStack((s) => {
+      if (s.length === 0) return s;
+      const prev = s[s.length - 1];
+      setRedoStack((r) => [...r, root]);
+      setRoot(prev);
+      onChange?.(prev);
+      return s.slice(0, -1);
+    });
+  }
+
+  function redo() {
+    setRedoStack((r) => {
+      if (r.length === 0) return r;
+      const next = r[r.length - 1];
+      setUndoStack((s) => [...s, root]);
+      setRoot(next);
+      onChange?.(next);
+      return r.slice(0, -1);
+    });
   }
 
   function add(node: EmailNode) {
@@ -79,32 +110,74 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
     },
   };
 
+  const [stageWidth, setStageWidth] = useState(600);
   const html = useMemo(() => renderToHtml(root), [root]);
 
+  // Templates removed; left panel hosts Chat instead
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 320px', gap: 12, alignItems: 'start' }}>
-      <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>Palette</div>
-        <Palette onInsert={add} factories={factories as any} />
-        {chatAdapter !== null && (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ fontWeight: 700 }}>AI</div>
-            <ChatPanel root={root} onActions={applyActions} adapter={adapter} />
+    <div className="neb neb-reset neb-app" style={{ ['--stage-width' as any]: `${stageWidth}px` }}>
+      <Toolbar
+        mode={mode}
+        onSetMode={setMode}
+        onCopyHtml={() => navigator.clipboard?.writeText(html)}
+        onExportHtml={() => {
+          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'email.html';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        }}
+        onPreviewWidth={(w) => setStageWidth(w)}
+        onUndo={undo}
+        onRedo={redo}
+      />
+      <div className="neb-shell" style={{ gridTemplateColumns: '320px 1fr 340px' }}>
+        <div className="neb-panel">
+          <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="neb-badges"><span className="neb-badge">AI</span></div>
+            <div className="neb-badges"><span className="neb-badge">Chat</span></div>
           </div>
-        )}
-      </div>
+          <div className="body">
+            {chatAdapter !== null && (
+              <ChatPanel root={root} onActions={applyActions} adapter={adapter} />
+            )}
+          </div>
+        </div>
+        <div className="neb-panel">
+          <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="neb-badges">
+              <span className="neb-badge">Width {stageWidth}px</span>
+              <span className="neb-badge">{mode === 'edit' ? 'Edit' : 'Preview'}</span>
+            </div>
+            <div className="neb-badges">
+              <span className="neb-badge">Blocks</span>
+            </div>
+          </div>
+          <div className="body" style={{ display: 'grid', gap: 12 }}>
+            <Palette onInsert={add} factories={factories as any} />
+            <Canvas
+              root={root}
+              onSelect={setSelectedId}
+              selectedId={selectedId}
+              onMoveUp={(id) => emit(moveSibling(root, id, -1))}
+              onMoveDown={(id) => emit(moveSibling(root, id, +1))}
+              onRemove={(id) => emit(removeNode(root, id))}
+              mode={mode}
+            />
+          </div>
+        </div>
 
-      <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>Canvas</div>
-        <Canvas root={root} onSelect={setSelectedId} selectedId={selectedId} />
-        <div style={{ fontWeight: 700 }}>Preview (HTML)</div>
-        <iframe title="preview" style={{ width: '100%', height: 360, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }} srcDoc={html} />
-      </div>
-
-      <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>Inspector</div>
-        <Inspector node={selected} onChange={(patch) => selected && emit(updateNode(root, selected.id, patch))} />
-        <button onClick={() => navigator.clipboard?.writeText(html)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff' }}>Copy HTML</button>
+        <div className="neb-panel neb-inspector">
+          <div className="header">Inspect</div>
+          <div className="body">
+            <Inspector node={selected} onChange={(patch) => selected && emit(updateNode(root, selected.id, patch))} />
+          </div>
+        </div>
       </div>
     </div>
   );

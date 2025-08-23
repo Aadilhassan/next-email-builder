@@ -10,4 +10,10 @@ export declare function findNode(root: EmailNode, id: string): EmailNode | undef
 export declare function updateNode(root: EmailNode, id: string, patch: Partial<EmailNode['props']>): EmailNode;
 export declare function insertNode(root: EmailNode, parentId: string, node: EmailNode, index?: number): EmailNode;
 export declare function removeNode(root: EmailNode, id: string): EmailNode;
+export declare function moveNode(root: EmailNode, id: string, newParentId: string, newIndex: number): EmailNode;
+export declare function findParent(root: EmailNode, id: string, parent?: EmailNode | null): {
+    parent: EmailNode | null;
+    index: number;
+} | null;
+export declare function moveSibling(root: EmailNode, id: string, delta: number): EmailNode;
 //# sourceMappingURL=core.d.ts.map

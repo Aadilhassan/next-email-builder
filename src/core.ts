@@ -110,3 +110,56 @@ export function removeNode(root: EmailNode, id: string): EmailNode {
   const filtered = root.children.filter((c) => c.id !== id).map((c) => removeNode(c, id));
   return { ...root, children: filtered };
 }
+
+export function moveNode(root: EmailNode, id: string, newParentId: string, newIndex: number): EmailNode {
+  // Extract node
+  let extracted: EmailNode | undefined;
+  function _remove(n: EmailNode): EmailNode {
+    if (!n.children) return n;
+    const idx = n.children.findIndex((c) => c.id === id);
+    if (idx >= 0) {
+      extracted = n.children[idx];
+      const nextChildren = [...n.children.slice(0, idx), ...n.children.slice(idx + 1)];
+      return { ...n, children: nextChildren };
+    }
+    return { ...n, children: n.children.map(_remove) };
+  }
+  const without = _remove(root);
+  if (!extracted) return root;
+  return insertNode(without, newParentId, extracted, newIndex);
+}
+
+export function findParent(
+  root: EmailNode,
+  id: string,
+  parent: EmailNode | null = null
+): { parent: EmailNode | null; index: number } | null {
+  if (!root.children) return null;
+  const idx = root.children.findIndex((c) => c.id === id);
+  if (idx >= 0) return { parent: root, index: idx };
+  for (const child of root.children) {
+    const res = findParent(child, id, root);
+    if (res) return res;
+  }
+  return null;
+}
+
+export function moveSibling(root: EmailNode, id: string, delta: number): EmailNode {
+  const info = findParent(root, id);
+  if (!info || !info.parent) return root;
+  const { parent, index } = info;
+  const children = [...(parent.children ?? [])];
+  const to = Math.max(0, Math.min(children.length - 1, index + delta));
+  if (to === index) return root;
+  const [node] = children.splice(index, 1);
+  children.splice(to, 0, node);
+  const replaced = { ...parent, children };
+  // write back replaced parent into tree
+  if (root.id === replaced.id) return replaced;
+  function write(n: EmailNode): EmailNode {
+    if (!n.children) return n;
+    if (n.id === replaced.id) return replaced;
+    return { ...n, children: n.children.map(write) };
+  }
+  return write(root);
+}

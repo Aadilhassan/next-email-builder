@@ -1,5 +1,8 @@
 import typescript from '@rollup/plugin-typescript';
 import babel from '@rollup/plugin-babel';
+import { readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export default {
   input: 'src/index.ts',
@@ -29,6 +32,14 @@ export default {
         ],
       ],
     }),
+    {
+      name: 'copy-styles',
+      writeBundle() {
+        const css = readFileSync('src/styles.css', 'utf8');
+        mkdirSync(dirname('dist/styles.css'), { recursive: true });
+        writeFileSync('dist/styles.css', css, 'utf8');
+      },
+    },
   ],
   external: ['react', 'react-dom', 'react/jsx-runtime', 'next'],
 };
