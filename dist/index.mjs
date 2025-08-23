@@ -1,5 +1,5 @@
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const createSection = (props = {}, children = []) => ({
@@ -275,6 +275,73 @@ function renderNode(node) {
   }
 }
 
+const PlusIcon = ({
+  size = 18
+}) => jsx("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: jsx("path", {
+    d: "M12 5v14M5 12h14",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  })
+});
+const ArrowUpIcon = ({
+  size = 16
+}) => jsx("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: jsx("path", {
+    d: "M12 5l-6 6m6-6l6 6M12 5v14",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  })
+});
+const ArrowDownIcon = ({
+  size = 16
+}) => jsx("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: jsx("path", {
+    d: "M12 19l6-6m-6 6l-6-6M12 19V5",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  })
+});
+const TrashIcon = ({
+  size = 15
+}) => jsx("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: jsx("path", {
+    d: "M4 7h16M9 7V4h6v3m-8 0l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  })
+});
 const Canvas = ({
   root,
   onSelect,
@@ -282,8 +349,66 @@ const Canvas = ({
   onMoveUp,
   onMoveDown,
   onRemove,
-  mode = 'edit'
+  mode = 'edit',
+  factories,
+  onInsertAt,
+  onInsertAfter
 }) => {
+  const [pickerFor, setPickerFor] = useState(undefined);
+  const [hoverId, setHoverId] = useState(undefined);
+  function BlockPicker({
+    onPick
+  }) {
+    const items = [{
+      t: 'text',
+      label: 'Text',
+      icon: jsx("span", {
+        style: {
+          fontWeight: 700
+        },
+        children: "T"
+      })
+    }, {
+      t: 'button',
+      label: 'Button',
+      icon: jsx("span", {
+        children: "\u2B1A"
+      })
+    }, {
+      t: 'image',
+      label: 'Image',
+      icon: jsx("span", {
+        children: "\u25A6"
+      })
+    }, {
+      t: 'spacer',
+      label: 'Spacer',
+      icon: jsx("span", {
+        children: "\u2014"
+      })
+    }, {
+      t: 'column',
+      label: 'Column',
+      icon: jsx("span", {
+        children: "\u25A5"
+      })
+    }];
+    return jsx("div", {
+      className: "neb-picker",
+      onClick: e => e.stopPropagation(),
+      children: items.map(it => jsxs("button", {
+        className: "neb-pick",
+        onClick: () => onPick(it.t),
+        children: [jsx("div", {
+          className: "icon",
+          children: it.icon
+        }), jsx("div", {
+          className: "lbl",
+          children: it.label
+        })]
+      }, it.t))
+    });
+  }
   function NodeView({
     node
   }) {
@@ -391,27 +516,60 @@ const Canvas = ({
         }
       });
     }
+    const showPicker = pickerFor === node.id && mode === 'edit';
+    const showAdd = mode === 'edit' && (hoverId === node.id || showPicker);
     return jsxs("div", {
       onClick: onNodeClick,
+      onMouseEnter: () => setHoverId(node.id),
+      onMouseLeave: () => setHoverId(id => id === node.id ? undefined : id),
       className: `neb-node ${isSelected ? 'selected' : ''}`,
-      children: [isSelected && jsxs("div", {
-        className: "neb-pop",
+      children: [showAdd && jsxs("div", {
+        className: "neb-add-wrap",
         onClick: e => e.stopPropagation(),
         children: [jsx("button", {
-          className: "neb-btn",
-          onClick: () => onMoveUp === null || onMoveUp === void 0 ? void 0 : onMoveUp(node.id),
+          type: "button",
+          className: "neb-add-btn",
+          title: "Add block",
+          onClick: () => setPickerFor(p => p === node.id ? undefined : node.id),
+          children: jsx(PlusIcon, {})
+        }), showPicker && jsx("div", {
+          className: "neb-picker-wrap",
+          children: jsx(BlockPicker, {
+            onPick: t => {
+              if (!factories) return;
+              const make = factories[t];
+              const newNode = make ? make() : {
+                id: Math.random().toString(36).slice(2),
+                type: t,
+                props: {}
+              };
+              if (node.type === 'section' || node.type === 'column') {
+                onInsertAt === null || onInsertAt === void 0 ? void 0 : onInsertAt(node.id, newNode);
+              } else {
+                onInsertAfter === null || onInsertAfter === void 0 ? void 0 : onInsertAfter(node.id, newNode);
+              }
+              setPickerFor(undefined);
+            }
+          })
+        })]
+      }), isSelected && mode === 'edit' && jsxs("div", {
+        className: "neb-side-ctrl",
+        onClick: e => e.stopPropagation(),
+        children: [jsx("button", {
+          className: "ctrl",
           title: "Move up",
-          children: "\u2191"
+          onClick: () => onMoveUp === null || onMoveUp === void 0 ? void 0 : onMoveUp(node.id),
+          children: jsx(ArrowUpIcon, {})
         }), jsx("button", {
-          className: "neb-btn",
-          onClick: () => onMoveDown === null || onMoveDown === void 0 ? void 0 : onMoveDown(node.id),
+          className: "ctrl",
           title: "Move down",
-          children: "\u2193"
+          onClick: () => onMoveDown === null || onMoveDown === void 0 ? void 0 : onMoveDown(node.id),
+          children: jsx(ArrowDownIcon, {})
         }), jsx("button", {
-          className: "neb-btn danger",
+          className: "ctrl danger",
+          title: "Delete",
           onClick: () => onRemove === null || onRemove === void 0 ? void 0 : onRemove(node.id),
-          title: "Remove",
-          children: "\u2715"
+          children: jsx(TrashIcon, {})
         })]
       }), mode === 'edit' && jsx("div", {
         className: "label",
@@ -420,7 +578,10 @@ const Canvas = ({
     });
   }
   return jsx("div", {
-    onClick: () => onSelect(undefined),
+    onClick: () => {
+      setPickerFor(undefined);
+      onSelect(undefined);
+    },
     className: "neb-canvas-wrap",
     "aria-label": "Canvas",
     children: jsx("div", {
@@ -435,34 +596,43 @@ const Canvas = ({
   });
 };
 
-const Palette = ({
-  onInsert,
-  factories
-}) => {
-  return jsx("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      flexWrap: 'wrap'
-    },
-    children: Object.entries(factories).map(([key, make]) => jsxs("button", {
-      onClick: () => onInsert(make()),
+function Field({
+  label,
+  children
+}) {
+  return jsxs("label", {
+    className: "field",
+    children: [jsx("span", {
       style: {
-        padding: '6px 8px',
-        borderRadius: 6,
-        border: '1px solid #cbd5e1',
-        background: '#fff'
+        fontSize: 12,
+        color: 'var(--subtle)'
       },
-      children: ["+ ", key]
-    }, key))
+      children: label
+    }), children]
   });
-};
-
+}
+function parsePx(v, d = 0) {
+  if (v == null) return d;
+  const m = String(v).match(/(-?\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : d;
+}
+function toPx(n) {
+  return `${Math.round(n)}px`;
+}
+function parsePadding(v) {
+  const s = String(v !== null && v !== void 0 ? v : '').trim();
+  if (!s) return [24, 24, 24, 24];
+  const parts = s.split(/\s+/).map(p => parsePx(p, 0));
+  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
+  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]];
+  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]];
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
 const Inspector = ({
   node,
   onChange
 }) => {
-  var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
+  var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9;
   if (!node) return jsx("div", {
     className: "neb",
     style: {
@@ -470,29 +640,89 @@ const Inspector = ({
     },
     children: "Select a node to edit."
   });
-  const props = (_a = node.props) !== null && _a !== void 0 ? _a : {};
+  const initial = (_a = node.props) !== null && _a !== void 0 ? _a : {};
+  // Local form state to prevent focus loss while typing
+  const [form, setForm] = useState(initial);
+  useEffect(() => {
+    setForm(initial);
+  }, [node.id]);
+  // Focus preservation across re-renders
+  const wrapRef = useRef(null);
+  const lastFocusRef = useRef(null);
+  // Capture focus inside inspector to remember which field was focused
+  const onFocusCapture = e => {
+    var _a, _b;
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement)) return;
+    lastFocusRef.current = {
+      name: t.name,
+      selStart: (_a = t.selectionStart) !== null && _a !== void 0 ? _a : null,
+      selEnd: (_b = t.selectionEnd) !== null && _b !== void 0 ? _b : null
+    };
+  };
+  // Also update caret position while typing/clicking
+  const onInputCapture = e => {
+    var _a, _b;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+      lastFocusRef.current = {
+        name: t.name,
+        selStart: (_a = t.selectionStart) !== null && _a !== void 0 ? _a : null,
+        selEnd: (_b = t.selectionEnd) !== null && _b !== void 0 ? _b : null
+      };
+    }
+  };
+  // When local form changes (set by onChange handlers), ensure the focused element remains focused
+  useLayoutEffect(() => {
+    var _a, _b;
+    const root = wrapRef.current;
+    if (!root) return;
+    const active = document.activeElement;
+    // If focus is already inside inspector, nothing to do
+    if (active && root.contains(active)) return;
+    const lf = lastFocusRef.current;
+    if (!lf || !lf.name) return;
+    const el = root.querySelector(`[name="${CSS.escape(lf.name)}"]`);
+    if (el) {
+      el.focus({
+        preventScroll: true
+      });
+      try {
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          const start = (_a = lf.selStart) !== null && _a !== void 0 ? _a : el.value.length;
+          const end = (_b = lf.selEnd) !== null && _b !== void 0 ? _b : start;
+          el.setSelectionRange(start, end);
+        }
+      } catch {}
+    }
+  }, [form]);
+  // Change helpers
+  const setOnly = patch => setForm(f => ({
+    ...f,
+    ...patch
+  }));
+  const commit = patch => {
+    if (patch) setOnly(patch);
+    // commit the current form to parent (single render)
+    onChange({
+      ...form,
+      ...(patch !== null && patch !== void 0 ? patch : {})
+    });
+  };
+  const props = form;
   const isText = node.type === 'text';
   const isButton = node.type === 'button';
   const isImage = node.type === 'image';
   const isSection = node.type === 'section';
   const isColumn = node.type === 'column';
-  function Field({
-    label,
-    children
-  }) {
-    return jsxs("label", {
-      className: "field",
-      children: [jsx("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--subtle)'
-        },
-        children: label
-      }), children]
-    });
-  }
+  const isSpacer = node.type === 'spacer';
+  // Field moved to top-level to avoid remounts on each render
+  const set = setOnly;
   return jsx("div", {
     className: "neb neb-inspector",
+    ref: wrapRef,
+    onFocusCapture: onFocusCapture,
+    onInputCapture: onInputCapture,
     children: jsx("div", {
       className: "body",
       style: {
@@ -514,10 +744,15 @@ const Inspector = ({
         }), isText && jsxs(Fragment, {
           children: [jsx(Field, {
             label: "Content",
-            children: jsx("input", {
+            children: jsx("textarea", {
               className: "neb-input",
+              name: "content",
+              rows: 3,
               value: (_b = props.content) !== null && _b !== void 0 ? _b : '',
-              onChange: e => onChange({
+              onChange: e => set({
+                content: e.target.value
+              }),
+              onBlur: e => commit({
                 content: e.target.value
               })
             })
@@ -526,9 +761,14 @@ const Inspector = ({
             children: [jsx(Field, {
               label: "Color",
               children: jsx("input", {
-                className: "neb-input",
+                type: "color",
+                className: "neb-color",
+                name: "text_color",
                 value: (_c = props.color) !== null && _c !== void 0 ? _c : '#111111',
-                onChange: e => onChange({
+                onChange: e => set({
+                  color: e.target.value
+                }),
+                onBlur: e => commit({
                   color: e.target.value
                 })
               })
@@ -536,8 +776,9 @@ const Inspector = ({
               label: "Align",
               children: jsxs("select", {
                 className: "neb-select",
+                name: "text_align",
                 value: (_d = props.align) !== null && _d !== void 0 ? _d : 'left',
-                onChange: e => onChange({
+                onChange: e => commit({
                   align: e.target.value
                 }),
                 children: [jsx("option", {
@@ -552,35 +793,83 @@ const Inspector = ({
                 })]
               })
             })]
-          }), jsxs("div", {
-            className: "row",
-            children: [jsx(Field, {
-              label: "Font size",
-              children: jsx("input", {
-                className: "neb-input",
-                value: (_e = props.fontSize) !== null && _e !== void 0 ? _e : '14px',
-                onChange: e => onChange({
-                  fontSize: e.target.value
-                })
+          }), jsx(Field, {
+            label: "Font family",
+            children: jsxs("select", {
+              className: "neb-select",
+              name: "font_family",
+              value: (_e = props.fontFamily) !== null && _e !== void 0 ? _e : 'inherit',
+              onChange: e => commit({
+                fontFamily: e.target.value
+              }),
+              children: [jsx("option", {
+                value: "inherit",
+                children: "Inherit"
+              }), jsx("option", {
+                value: "Arial, Helvetica, sans-serif",
+                children: "Arial"
+              }), jsx("option", {
+                value: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+                children: "Segoe UI"
+              }), jsx("option", {
+                value: "Roboto, Helvetica, Arial, sans-serif",
+                children: "Roboto"
+              }), jsx("option", {
+                value: "Georgia, 'Times New Roman', Times, serif",
+                children: "Georgia"
+              }), jsx("option", {
+                value: "'Times New Roman', Times, serif",
+                children: "Times"
+              }), jsx("option", {
+                value: "'Courier New', Courier, monospace",
+                children: "Courier New"
+              })]
+            })
+          }), jsx(Field, {
+            label: `Font size: ${parsePx((_f = props.fontSize) !== null && _f !== void 0 ? _f : '14px', 14)}px`,
+            children: jsx("input", {
+              type: "range",
+              name: "font_size",
+              min: 10,
+              max: 48,
+              className: "neb-slider",
+              value: parsePx((_g = props.fontSize) !== null && _g !== void 0 ? _g : '14px', 14),
+              onChange: e => set({
+                fontSize: toPx(Number(e.target.value))
+              }),
+              onPointerUp: e => commit({
+                fontSize: toPx(Number(e.target.value))
               })
-            }), jsx(Field, {
-              label: "Line height",
-              children: jsx("input", {
-                className: "neb-input",
-                value: (_f = props.lineHeight) !== null && _f !== void 0 ? _f : '1.5',
-                onChange: e => onChange({
-                  lineHeight: e.target.value
-                })
+            })
+          }), jsx(Field, {
+            label: `Line height: ${Number((_h = props.lineHeight) !== null && _h !== void 0 ? _h : 1.5).toFixed(2)}`,
+            children: jsx("input", {
+              type: "range",
+              name: "line_height",
+              min: 1,
+              max: 2,
+              step: 0.05,
+              className: "neb-slider",
+              value: Number((_j = props.lineHeight) !== null && _j !== void 0 ? _j : 1.5),
+              onChange: e => set({
+                lineHeight: Number(e.target.value)
+              }),
+              onPointerUp: e => commit({
+                lineHeight: Number(e.target.value)
               })
-            })]
+            })
           })]
         }), isButton && jsxs(Fragment, {
           children: [jsx(Field, {
             label: "Label",
             children: jsx("input", {
               className: "neb-input",
-              value: (_g = props.label) !== null && _g !== void 0 ? _g : 'Click me',
-              onChange: e => onChange({
+              name: "btn_label",
+              value: (_k = props.label) !== null && _k !== void 0 ? _k : 'Click me',
+              onChange: e => set({
+                label: e.target.value
+              }),
+              onBlur: e => commit({
                 label: e.target.value
               })
             })
@@ -588,8 +877,12 @@ const Inspector = ({
             label: "Href",
             children: jsx("input", {
               className: "neb-input",
-              value: (_h = props.href) !== null && _h !== void 0 ? _h : '#',
-              onChange: e => onChange({
+              name: "btn_href",
+              value: (_l = props.href) !== null && _l !== void 0 ? _l : '#',
+              onChange: e => set({
+                href: e.target.value
+              }),
+              onBlur: e => commit({
                 href: e.target.value
               })
             })
@@ -598,51 +891,116 @@ const Inspector = ({
             children: [jsx(Field, {
               label: "Background",
               children: jsx("input", {
-                className: "neb-input",
-                value: (_j = props.backgroundColor) !== null && _j !== void 0 ? _j : '#0f172a',
-                onChange: e => onChange({
+                type: "color",
+                className: "neb-color",
+                name: "btn_bg",
+                value: (_m = props.backgroundColor) !== null && _m !== void 0 ? _m : '#0f172a',
+                onChange: e => set({
+                  backgroundColor: e.target.value
+                }),
+                onBlur: e => commit({
                   backgroundColor: e.target.value
                 })
               })
             }), jsx(Field, {
               label: "Text color",
               children: jsx("input", {
-                className: "neb-input",
-                value: (_k = props.color) !== null && _k !== void 0 ? _k : '#ffffff',
-                onChange: e => onChange({
+                type: "color",
+                className: "neb-color",
+                name: "btn_color",
+                value: (_o = props.color) !== null && _o !== void 0 ? _o : '#ffffff',
+                onChange: e => set({
+                  color: e.target.value
+                }),
+                onBlur: e => commit({
                   color: e.target.value
                 })
               })
             })]
-          }), jsxs("div", {
-            className: "row",
-            children: [jsx(Field, {
-              label: "Padding",
-              children: jsx("input", {
-                className: "neb-input",
-                value: (_l = props.padding) !== null && _l !== void 0 ? _l : '12px 16px',
-                onChange: e => onChange({
-                  padding: e.target.value
-                })
+          }), jsx(Field, {
+            label: `Padding vertical: ${parsePx((_q = ((_p = props.padding) !== null && _p !== void 0 ? _p : '').split(' ')[0]) !== null && _q !== void 0 ? _q : '12px', 12)}px`,
+            children: jsx("input", {
+              type: "range",
+              name: "btn_pad_v",
+              min: 0,
+              max: 32,
+              className: "neb-slider",
+              value: parsePx((_s = ((_r = props.padding) !== null && _r !== void 0 ? _r : '').split(' ')[0]) !== null && _s !== void 0 ? _s : '12px', 12),
+              onChange: e => {
+                var _a, _b;
+                const v = Number(e.target.value);
+                const parts = String((_a = props.padding) !== null && _a !== void 0 ? _a : '12px 16px').split(/\s+/);
+                const h = parsePx((_b = parts[1]) !== null && _b !== void 0 ? _b : parts[0], 16);
+                set({
+                  padding: `${toPx(v)} ${toPx(h)}`
+                });
+              },
+              onPointerUp: e => {
+                var _a, _b;
+                const v = Number(e.target.value);
+                const parts = String((_a = props.padding) !== null && _a !== void 0 ? _a : '12px 16px').split(/\s+/);
+                const h = parsePx((_b = parts[1]) !== null && _b !== void 0 ? _b : parts[0], 16);
+                commit({
+                  padding: `${toPx(v)} ${toPx(h)}`
+                });
+              }
+            })
+          }), jsx(Field, {
+            label: `Padding horizontal: ${parsePx((_u = ((_t = props.padding) !== null && _t !== void 0 ? _t : '').split(' ')[1]) !== null && _u !== void 0 ? _u : '16px', 16)}px`,
+            children: jsx("input", {
+              type: "range",
+              name: "btn_pad_h",
+              min: 0,
+              max: 64,
+              className: "neb-slider",
+              value: parsePx((_w = ((_v = props.padding) !== null && _v !== void 0 ? _v : '').split(' ')[1]) !== null && _w !== void 0 ? _w : '16px', 16),
+              onChange: e => {
+                var _a;
+                const h = Number(e.target.value);
+                const parts = String((_a = props.padding) !== null && _a !== void 0 ? _a : '12px 16px').split(/\s+/);
+                const v = parsePx(parts[0], 12);
+                set({
+                  padding: `${toPx(v)} ${toPx(h)}`
+                });
+              },
+              onPointerUp: e => {
+                var _a;
+                const h = Number(e.target.value);
+                const parts = String((_a = props.padding) !== null && _a !== void 0 ? _a : '12px 16px').split(/\s+/);
+                const v = parsePx(parts[0], 12);
+                commit({
+                  padding: `${toPx(v)} ${toPx(h)}`
+                });
+              }
+            })
+          }), jsx(Field, {
+            label: `Radius: ${parsePx((_x = props.borderRadius) !== null && _x !== void 0 ? _x : '4px', 4)}px`,
+            children: jsx("input", {
+              type: "range",
+              name: "btn_radius",
+              min: 0,
+              max: 32,
+              className: "neb-slider",
+              value: parsePx((_y = props.borderRadius) !== null && _y !== void 0 ? _y : '4px', 4),
+              onChange: e => set({
+                borderRadius: toPx(Number(e.target.value))
+              }),
+              onPointerUp: e => commit({
+                borderRadius: toPx(Number(e.target.value))
               })
-            }), jsx(Field, {
-              label: "Radius",
-              children: jsx("input", {
-                className: "neb-input",
-                value: (_m = props.borderRadius) !== null && _m !== void 0 ? _m : '4px',
-                onChange: e => onChange({
-                  borderRadius: e.target.value
-                })
-              })
-            })]
+            })
           })]
         }), isImage && jsxs(Fragment, {
           children: [jsx(Field, {
             label: "Src",
             children: jsx("input", {
               className: "neb-input",
-              value: (_o = props.src) !== null && _o !== void 0 ? _o : '',
-              onChange: e => onChange({
+              name: "img_src",
+              value: (_z = props.src) !== null && _z !== void 0 ? _z : '',
+              onChange: e => set({
+                src: e.target.value
+              }),
+              onBlur: e => commit({
                 src: e.target.value
               })
             })
@@ -652,18 +1010,29 @@ const Inspector = ({
               label: "Alt",
               children: jsx("input", {
                 className: "neb-input",
-                value: (_p = props.alt) !== null && _p !== void 0 ? _p : '',
-                onChange: e => onChange({
+                name: "img_alt",
+                value: (_0 = props.alt) !== null && _0 !== void 0 ? _0 : '',
+                onChange: e => set({
+                  alt: e.target.value
+                }),
+                onBlur: e => commit({
                   alt: e.target.value
                 })
               })
             }), jsx(Field, {
               label: "Width",
               children: jsx("input", {
-                className: "neb-input",
-                value: (_q = props.width) !== null && _q !== void 0 ? _q : '600',
-                onChange: e => onChange({
-                  width: e.target.value
+                type: "range",
+                name: "img_width",
+                min: 50,
+                max: 800,
+                className: "neb-slider",
+                value: parsePx((_1 = props.width) !== null && _1 !== void 0 ? _1 : '600', 600),
+                onChange: e => set({
+                  width: String(Number(e.target.value))
+                }),
+                onPointerUp: e => commit({
+                  width: String(Number(e.target.value))
                 })
               })
             })]
@@ -672,19 +1041,115 @@ const Inspector = ({
           children: [jsx(Field, {
             label: "Background",
             children: jsx("input", {
-              className: "neb-input",
-              value: (_r = props.backgroundColor) !== null && _r !== void 0 ? _r : '#ffffff',
-              onChange: e => onChange({
+              type: "color",
+              className: "neb-color",
+              name: "section_bg",
+              value: (_2 = props.backgroundColor) !== null && _2 !== void 0 ? _2 : '#ffffff',
+              onChange: e => set({
+                backgroundColor: e.target.value
+              }),
+              onBlur: e => commit({
                 backgroundColor: e.target.value
               })
             })
-          }), jsx(Field, {
-            label: "Padding",
+          }), (() => {
+            var _a;
+            const [pt, pr, pb, pl] = parsePadding((_a = props.padding) !== null && _a !== void 0 ? _a : '24px 24px');
+            return jsxs(Fragment, {
+              children: [jsx(Field, {
+                label: `Padding top: ${pt}px`,
+                children: jsx("input", {
+                  type: "range",
+                  name: "section_pad_t",
+                  min: 0,
+                  max: 64,
+                  className: "neb-slider",
+                  value: pt,
+                  onChange: e => set({
+                    padding: `${toPx(Number(e.target.value))} ${toPx(pr)} ${toPx(pb)} ${toPx(pl)}`
+                  }),
+                  onPointerUp: e => commit({
+                    padding: `${toPx(Number(e.target.value))} ${toPx(pr)} ${toPx(pb)} ${toPx(pl)}`
+                  })
+                })
+              }), jsx(Field, {
+                label: `Padding right: ${pr}px`,
+                children: jsx("input", {
+                  type: "range",
+                  name: "section_pad_r",
+                  min: 0,
+                  max: 64,
+                  className: "neb-slider",
+                  value: pr,
+                  onChange: e => set({
+                    padding: `${toPx(pt)} ${toPx(Number(e.target.value))} ${toPx(pb)} ${toPx(pl)}`
+                  }),
+                  onPointerUp: e => commit({
+                    padding: `${toPx(pt)} ${toPx(Number(e.target.value))} ${toPx(pb)} ${toPx(pl)}`
+                  })
+                })
+              }), jsx(Field, {
+                label: `Padding bottom: ${pb}px`,
+                children: jsx("input", {
+                  type: "range",
+                  name: "section_pad_b",
+                  min: 0,
+                  max: 64,
+                  className: "neb-slider",
+                  value: pb,
+                  onChange: e => set({
+                    padding: `${toPx(pt)} ${toPx(pr)} ${toPx(Number(e.target.value))} ${toPx(pl)}`
+                  }),
+                  onPointerUp: e => commit({
+                    padding: `${toPx(pt)} ${toPx(pr)} ${toPx(Number(e.target.value))} ${toPx(pl)}`
+                  })
+                })
+              }), jsx(Field, {
+                label: `Padding left: ${pl}px`,
+                children: jsx("input", {
+                  type: "range",
+                  name: "section_pad_l",
+                  min: 0,
+                  max: 64,
+                  className: "neb-slider",
+                  value: pl,
+                  onChange: e => set({
+                    padding: `${toPx(pt)} ${toPx(pr)} ${toPx(pb)} ${toPx(Number(e.target.value))}`
+                  }),
+                  onPointerUp: e => commit({
+                    padding: `${toPx(pt)} ${toPx(pr)} ${toPx(pb)} ${toPx(Number(e.target.value))}`
+                  })
+                })
+              })]
+            });
+          })(), jsx(Field, {
+            label: `Border radius: ${parsePx((_3 = props.borderRadius) !== null && _3 !== void 0 ? _3 : '0px', 0)}px`,
             children: jsx("input", {
-              className: "neb-input",
-              value: (_s = props.padding) !== null && _s !== void 0 ? _s : '24px 24px',
-              onChange: e => onChange({
-                padding: e.target.value
+              type: "range",
+              name: "section_radius",
+              min: 0,
+              max: 32,
+              className: "neb-slider",
+              value: parsePx((_4 = props.borderRadius) !== null && _4 !== void 0 ? _4 : '0px', 0),
+              onChange: e => set({
+                borderRadius: toPx(Number(e.target.value))
+              }),
+              onPointerUp: e => commit({
+                borderRadius: toPx(Number(e.target.value))
+              })
+            })
+          }), jsx(Field, {
+            label: "Border color",
+            children: jsx("input", {
+              type: "color",
+              className: "neb-color",
+              name: "section_border",
+              value: (_5 = props.borderColor) !== null && _5 !== void 0 ? _5 : '#000000',
+              onChange: e => set({
+                borderColor: e.target.value
+              }),
+              onBlur: e => commit({
+                borderColor: e.target.value
               })
             })
           })]
@@ -692,22 +1157,52 @@ const Inspector = ({
           children: [jsx(Field, {
             label: "Width",
             children: jsx("input", {
-              className: "neb-input",
-              value: (_t = props.width) !== null && _t !== void 0 ? _t : '100%',
-              onChange: e => onChange({
-                width: e.target.value
+              type: "range",
+              name: "col_width",
+              min: 10,
+              max: 100,
+              className: "neb-slider",
+              value: parsePx((_6 = props.width) !== null && _6 !== void 0 ? _6 : '100%', 100),
+              onChange: e => set({
+                width: `${Number(e.target.value)}%`
+              }),
+              onPointerUp: e => commit({
+                width: `${Number(e.target.value)}%`
               })
             })
           }), jsx(Field, {
             label: "Padding",
             children: jsx("input", {
-              className: "neb-input",
-              value: (_u = props.padding) !== null && _u !== void 0 ? _u : '0px',
-              onChange: e => onChange({
-                padding: e.target.value
+              type: "range",
+              name: "col_padding",
+              min: 0,
+              max: 48,
+              className: "neb-slider",
+              value: parsePx((_7 = props.padding) !== null && _7 !== void 0 ? _7 : '0px', 0),
+              onChange: e => set({
+                padding: toPx(Number(e.target.value))
+              }),
+              onPointerUp: e => commit({
+                padding: toPx(Number(e.target.value))
               })
             })
           })]
+        }), isSpacer && jsx(Field, {
+          label: `Height: ${parsePx((_8 = props.height) !== null && _8 !== void 0 ? _8 : '16px', 16)}px`,
+          children: jsx("input", {
+            type: "range",
+            name: "spacer_height",
+            min: 4,
+            max: 64,
+            className: "neb-slider",
+            value: parsePx((_9 = props.height) !== null && _9 !== void 0 ? _9 : '16px', 16),
+            onChange: e => set({
+              height: toPx(Number(e.target.value))
+            }),
+            onPointerUp: e => commit({
+              height: toPx(Number(e.target.value))
+            })
+          })
         })]
       })
     })
@@ -811,6 +1306,84 @@ const EyeIcon = ({
     fill: "none"
   })]
 });
+const PhoneIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": "true",
+  children: [jsx("rect", {
+    x: "8",
+    y: "3",
+    width: "8",
+    height: "18",
+    rx: "2",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  }), jsx("circle", {
+    cx: "12",
+    cy: "18",
+    r: "1",
+    fill: "currentColor"
+  })]
+});
+const TabletIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": "true",
+  children: [jsx("rect", {
+    x: "3",
+    y: "5",
+    width: "18",
+    height: "14",
+    rx: "2",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  }), jsx("circle", {
+    cx: "12",
+    cy: "16.5",
+    r: "0.8",
+    fill: "currentColor"
+  })]
+});
+const DesktopIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": "true",
+  children: [jsx("rect", {
+    x: "3",
+    y: "4",
+    width: "18",
+    height: "12",
+    rx: "2",
+    stroke: "currentColor",
+    strokeWidth: "1.5",
+    fill: "none"
+  }), jsx("path", {
+    d: "M9 20h6",
+    stroke: "currentColor",
+    strokeWidth: "1.5"
+  }), jsx("path", {
+    d: "M10 16v4M14 16v4",
+    stroke: "currentColor",
+    strokeWidth: "1.5"
+  })]
+});
 const Toolbar = ({
   mode,
   onSetMode,
@@ -818,8 +1391,10 @@ const Toolbar = ({
   onExportHtml,
   onPreviewWidth,
   onUndo,
-  onRedo
+  onRedo,
+  activeWidth
 }) => {
+  const isActiveWidth = w => activeWidth === w;
   return jsxs("div", {
     className: "neb neb-toolbar",
     children: [jsxs("div", {
@@ -843,37 +1418,25 @@ const Toolbar = ({
           fontSize: 12
         },
         children: "Mode"
-      }), jsx("div", {
-        className: "neb-switch",
+      }), jsxs("div", {
+        className: "neb-seg",
         role: "group",
-        "aria-label": "Mode switch",
-        children: jsxs("button", {
+        "aria-label": "Mode",
+        children: [jsx("button", {
           type: "button",
-          className: `neb-switch-track`,
-          role: "switch",
-          "aria-checked": mode === 'preview',
-          "aria-label": mode === 'preview' ? 'Preview' : 'Edit',
-          onClick: () => onSetMode(mode === 'edit' ? 'preview' : 'edit'),
-          children: [jsx("span", {
-            className: `neb-switch-thumb ${mode === 'preview' ? 'right' : 'left'}`
-          }), jsx("span", {
-            className: `neb-switch-icon ${mode === 'edit' ? 'active' : ''}`,
-            onClick: e => {
-              e.stopPropagation();
-              onSetMode('edit');
-            },
-            title: "Edit",
-            children: jsx(PencilIcon, {})
-          }), jsx("span", {
-            className: `neb-switch-icon ${mode === 'preview' ? 'active' : ''}`,
-            onClick: e => {
-              e.stopPropagation();
-              onSetMode('preview');
-            },
-            title: "Preview",
-            children: jsx(EyeIcon, {})
-          })]
-        })
+          className: `seg-btn ${mode === 'edit' ? 'active' : ''}`,
+          onClick: () => onSetMode('edit'),
+          "aria-pressed": mode === 'edit',
+          title: "Edit",
+          children: jsx(PencilIcon, {})
+        }), jsx("button", {
+          type: "button",
+          className: `seg-btn ${mode === 'preview' ? 'active' : ''}`,
+          onClick: () => onSetMode('preview'),
+          "aria-pressed": mode === 'preview',
+          title: "Preview",
+          children: jsx(EyeIcon, {})
+        })]
       })]
     }), jsxs("div", {
       className: "group",
@@ -883,18 +1446,32 @@ const Toolbar = ({
           fontSize: 12
         },
         children: "Preview"
-      }), jsx("button", {
-        className: "neb-btn",
-        onClick: () => onPreviewWidth(360),
-        children: "Mobile"
-      }), jsx("button", {
-        className: "neb-btn",
-        onClick: () => onPreviewWidth(600),
-        children: "Default"
-      }), jsx("button", {
-        className: "neb-btn",
-        onClick: () => onPreviewWidth(800),
-        children: "Desktop"
+      }), jsxs("div", {
+        className: "neb-seg",
+        role: "group",
+        "aria-label": "Preview width",
+        children: [jsx("button", {
+          type: "button",
+          className: `seg-btn ${(isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(360)) ? 'active' : ''}`,
+          onClick: () => onPreviewWidth(360),
+          "aria-pressed": isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(360),
+          title: "Mobile",
+          children: jsx(PhoneIcon, {})
+        }), jsx("button", {
+          type: "button",
+          className: `seg-btn ${(isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(600)) ? 'active' : ''}`,
+          onClick: () => onPreviewWidth(600),
+          "aria-pressed": isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(600),
+          title: "Default",
+          children: jsx(TabletIcon, {})
+        }), jsx("button", {
+          type: "button",
+          className: `seg-btn ${(isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(800)) ? 'active' : ''}`,
+          onClick: () => onPreviewWidth(800),
+          "aria-pressed": isActiveWidth === null || isActiveWidth === void 0 ? void 0 : isActiveWidth(800),
+          title: "Desktop",
+          children: jsx(DesktopIcon, {})
+        })]
       })]
     }), jsxs("div", {
       className: "group",
@@ -952,9 +1529,29 @@ const Editor = ({
       return r.slice(0, -1);
     });
   }
-  function add(node) {
-    const parentId = selectedId !== null && selectedId !== void 0 ? selectedId : root.id;
-    emit(insertNode(root, parentId, node));
+  function insertAfter(targetId, node) {
+    // Find parent and index of target, then insert at index+1
+    // Reuse findNode to walk for parent since we have utilities in core for reordering
+    function walk(n, p) {
+      if (!n.children) return undefined;
+      const idx = n.children.findIndex(c => c.id === targetId);
+      if (idx >= 0) return {
+        parent: n,
+        index: idx
+      };
+      for (const c of n.children) {
+        const r = walk(c);
+        if (r) return r;
+      }
+      return undefined;
+    }
+    const info = walk(root);
+    if ((info === null || info === void 0 ? void 0 : info.parent) && info.index !== undefined) {
+      emit(insertNode(root, info.parent.id, node, info.index + 1));
+    } else {
+      // If not found as a sibling, append to root
+      emit(insertNode(root, root.id, node));
+    }
   }
   function applyActions(actions) {
     let current = root;
@@ -1055,6 +1652,7 @@ const Editor = ({
         URL.revokeObjectURL(url);
       },
       onPreviewWidth: w => setStageWidth(w),
+      activeWidth: stageWidth,
       onUndo: undo,
       onRedo: redo
     }), jsxs("div", {
@@ -1117,24 +1715,23 @@ const Editor = ({
               children: "Blocks"
             })
           })]
-        }), jsxs("div", {
+        }), jsx("div", {
           className: "body",
           style: {
-            display: 'grid',
-            gap: 12
+            display: 'grid'
           },
-          children: [jsx(Palette, {
-            onInsert: add,
-            factories: factories
-          }), jsx(Canvas, {
+          children: jsx(Canvas, {
             root: root,
             onSelect: setSelectedId,
             selectedId: selectedId,
             onMoveUp: id => emit(moveSibling(root, id, -1)),
             onMoveDown: id => emit(moveSibling(root, id, 1)),
             onRemove: id => emit(removeNode(root, id)),
-            mode: mode
-          })]
+            mode: mode,
+            factories: factories,
+            onInsertAt: (parentId, node, index) => emit(insertNode(root, parentId, node, index)),
+            onInsertAfter: (id, n) => insertAfter(id, n)
+          })
         })]
       }), jsxs("div", {
         className: "neb-panel neb-inspector",

@@ -8,6 +8,9 @@ type Props = {
     onMoveDown?: (id: string) => void;
     onRemove?: (id: string) => void;
     mode?: 'edit' | 'preview';
+    factories?: Record<string, () => EmailNode>;
+    onInsertAt?: (parentId: string, node: EmailNode, index?: number) => void;
+    onInsertAfter?: (targetId: string, node: EmailNode) => void;
 };
 export declare const Canvas: React.FC<Props>;
 export {};
