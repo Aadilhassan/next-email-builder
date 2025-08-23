@@ -1,0 +1,22 @@
+{
+  "name": "next-email-builder-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.11",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^5.0.1",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.8"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "next-email-builder": ["../src/index.ts"],
+      "next-email-builder/*": ["../src/*"]
+    }
+  },
+  "include": ["src"]
+}

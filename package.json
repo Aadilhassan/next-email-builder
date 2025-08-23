@@ -16,7 +16,10 @@
   "scripts": {
     "build": "rimraf dist && rollup -c && tsc -p tsconfig.build.json",
     "dev": "rollup -c -w",
-    "test": "vitest run"
+    "test": "vitest run",
+    "play:dev": "npm --prefix playground run dev",
+    "play:build": "npm --prefix playground run build",
+    "play:preview": "npm --prefix playground run preview"
   },
   "keywords": [],
   "author": "",
