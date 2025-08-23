@@ -5,19 +5,30 @@ export default {
   input: 'src/index.ts',
   output: [
     {
-      file: 'dist/index.js',
+      file: 'dist/index.cjs',
       format: 'cjs',
+      sourcemap: true,
     },
     {
-      file: 'dist/index.es.js',
+      file: 'dist/index.mjs',
       format: 'es',
+      sourcemap: true,
     },
   ],
   plugins: [
-    typescript(),
+    typescript({ tsconfig: './tsconfig.rollup.json' }),
     babel({
-      presets: ['@babel/preset-react'],
+      babelHelpers: 'bundled',
+      extensions: ['.ts', '.tsx'],
+      presets: [
+        [
+          '@babel/preset-react',
+          {
+            runtime: 'automatic',
+          },
+        ],
+      ],
     }),
   ],
-  external: ['react', 'react-dom', 'next'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', 'next'],
 };
