@@ -275,6 +275,154 @@ function renderNode(node) {
   }
 }
 
+function parseStyle(style) {
+  const out = {};
+  if (!style) return out;
+  style.split(';').forEach(part => {
+    const [k, ...rest] = part.split(':');
+    if (!k || rest.length === 0) return;
+    const key = k.trim().toLowerCase();
+    const val = rest.join(':').trim();
+    if (key) out[key] = val;
+  });
+  return out;
+}
+function textOf(el) {
+  var _a;
+  return (_a = el.innerHTML) !== null && _a !== void 0 ? _a : '';
+}
+function parseSectionTd(td) {
+  const s = parseStyle(td.getAttribute('style'));
+  const backgroundColor = s['background'] || s['background-color'] || '#ffffff';
+  const padding = s['padding'] || '24px 24px';
+  const align = td.getAttribute('align') || 'left';
+  const section = createSection({
+    backgroundColor,
+    padding,
+    align
+  });
+  const children = [];
+  td.childNodes.forEach(node => {
+    var _a;
+    if (node.nodeType !== 1) return; // element
+    const el = node;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'table') {
+      // Likely a column
+      const width = (el.getAttribute('width') || ((_a = parseStyle(el.getAttribute('style'))['width']) !== null && _a !== void 0 ? _a : '100%')).toString();
+      // find td inside
+      const innerTd = el.querySelector('td');
+      const col = createColumn({
+        width,
+        padding: innerTd ? parseStyle(innerTd.getAttribute('style'))['padding'] || '0px' : '0px'
+      });
+      const blocks = innerTd ? parseBlocks(innerTd) : [];
+      col.children = blocks;
+      children.push(col);
+    } else {
+      // direct blocks inside section
+      const blocks = parseBlocks(td);
+      blocks.forEach(b => children.push(b));
+    }
+  });
+  section.children = children;
+  return section;
+}
+function parseBlocks(container) {
+  const out = [];
+  container.childNodes.forEach(n => {
+    var _a, _b, _c, _d, _e;
+    if (n.nodeType !== 1) return;
+    const el = n;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'div') {
+      const s = parseStyle(el.getAttribute('style'));
+      const hasHeightOnly = !!s['height'] && (((_a = s['font-size']) === null || _a === void 0 ? void 0 : _a.includes('1px')) || s['line-height'] === s['height']);
+      if (hasHeightOnly) {
+        out.push(createSpacer({
+          height: s['height']
+        }));
+      } else {
+        out.push(createText({
+          content: textOf(el),
+          align: s['text-align'] || 'left',
+          color: s['color'] || '#111111',
+          fontSize: s['font-size'] || '14px',
+          lineHeight: s['line-height'] || '1.5'
+        }));
+      }
+      return;
+    }
+    if (tag === 'a') {
+      const s = parseStyle(el.getAttribute('style'));
+      // If it's our button style (inline-block + background)
+      if ((((_b = s['display']) === null || _b === void 0 ? void 0 : _b.includes('inline-block')) || ((_c = s['display']) === null || _c === void 0 ? void 0 : _c.includes('inline'))) && (s['background'] || s['background-color'])) {
+        out.push(createButton({
+          label: el.textContent || 'Click me',
+          href: el.getAttribute('href') || '#',
+          backgroundColor: s['background'] || s['background-color'] || '#0f172a',
+          color: s['color'] || '#ffffff',
+          padding: s['padding'] || '12px 16px',
+          borderRadius: s['border-radius'] || '4px'
+        }));
+        return;
+      }
+      // Could also be a linked image
+      const img = el.querySelector('img');
+      if (img) {
+        const istyle = parseStyle(img.getAttribute('style'));
+        out.push(createImage({
+          src: img.getAttribute('src') || '',
+          alt: img.getAttribute('alt') || '',
+          width: img.getAttribute('width') || ((_d = istyle['width']) === null || _d === void 0 ? void 0 : _d.replace('px', '')) || '600',
+          href: el.getAttribute('href') || undefined
+        }));
+        return;
+      }
+    }
+    if (tag === 'img') {
+      const s = parseStyle(el.getAttribute('style'));
+      out.push(createImage({
+        src: el.getAttribute('src') || '',
+        alt: el.getAttribute('alt') || '',
+        width: el.getAttribute('width') || ((_e = s['width']) === null || _e === void 0 ? void 0 : _e.replace('px', '')) || '600'
+      }));
+      return;
+    }
+  });
+  return out;
+}
+function parseHtmlToTree(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const inner = doc.querySelector('table[width="600"]');
+    if (!inner) throw new Error('Unable to find inner table');
+    const sections = [];
+    inner.querySelectorAll(':scope > tbody > tr > td, :scope > tr > td').forEach(td => {
+      // Different browsers may or may not include tbody
+      sections.push(parseSectionTd(td));
+    });
+    if (sections.length === 0) {
+      // Fallback: one blank section+column
+      const section = createSection({}, [createColumn({}, [createText({
+        content: 'Hello'
+      })])]);
+      return section;
+    }
+    // If multiple sections detected, wrap them into a root section with columns? Our model expects root to be a section; allow multiple by creating a root with children as sections.
+    if (sections.length === 1) return sections[0];
+    const root = createSection({}, []);
+    root.children = sections;
+    return root;
+  } catch (e) {
+    // Fallback to a simple default if parsing fails
+    return createSection({}, [createColumn({}, [createText({
+      content: 'Hello'
+    })])]);
+  }
+}
+
 const PlusIcon = ({
   size = 18
 }) => jsx("svg", {
@@ -528,8 +676,11 @@ const Canvas = ({
         onClick: e => e.stopPropagation(),
         children: [jsx("button", {
           type: "button",
-          className: "neb-add-btn",
+          className: "neb-add-btn ",
           title: "Add block",
+          style: {
+            color: '#fff'
+          },
           onClick: () => setPickerFor(p => p === node.id ? undefined : node.id),
           children: jsx(PlusIcon, {})
         }), showPicker && jsx("div", {
@@ -1216,48 +1367,121 @@ const ChatPanel = ({
 }) => {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const listRef = useRef(null);
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, busy]);
+  function summarize(actions) {
+    if (!actions.length) return 'No changes.';
+    const types = actions.map(a => a.type);
+    if (types.includes('replace')) return 'Replaced the entire email with a new template.';
+    const counts = types.reduce((m, t) => {
+      var _a;
+      return m[t] = ((_a = m[t]) !== null && _a !== void 0 ? _a : 0) + 1, m;
+    }, {});
+    const parts = Object.entries(counts).map(([t, n]) => `${n} ${t}`);
+    return `Applied: ${parts.join(', ')}.`;
+  }
   async function onSubmit(e) {
     e.preventDefault();
-    if (!input.trim()) return;
+    const text = input.trim();
+    if (!text) return;
+    setMessages(m => [...m, {
+      role: 'user',
+      content: text
+    }]);
     setBusy(true);
     try {
-      const actions = await adapter.send({
+      const res = await adapter.send({
         root,
-        message: input.trim()
+        message: text
       });
+      const {
+        actions,
+        summary,
+        reply
+      } = Array.isArray(res) ? {
+        actions: res,
+        summary: undefined,
+        reply: undefined
+      } : res;
       onActions(actions);
+      const msgs = [];
+      if (reply && reply.trim()) msgs.push({
+        role: 'assistant',
+        content: reply
+      });
+      const fallback = actions.length > 0 ? summarize(actions) : `No changes.`;
+      const summaryToShow = summary || (actions.length ? fallback : undefined);
+      if (summaryToShow) msgs.push({
+        role: 'assistant',
+        content: summaryToShow
+      });
+      if (msgs.length === 0) msgs.push({
+        role: 'assistant',
+        content: 'No changes.'
+      });
+      setMessages(m => [...m, ...msgs]);
       setInput('');
+    } catch (err) {
+      setMessages(m => {
+        var _a;
+        return [...m, {
+          role: 'assistant',
+          content: `Error: ${(_a = err === null || err === void 0 ? void 0 : err.message) !== null && _a !== void 0 ? _a : String(err)}`
+        }];
+      });
     } finally {
       setBusy(false);
     }
   }
-  return jsxs("form", {
-    onSubmit: onSubmit,
+  return jsxs("div", {
     style: {
-      display: 'flex',
-      gap: 8
+      display: 'grid',
+      gridTemplateRows: '1fr auto',
+      gap: 8,
+      height: '100%'
     },
-    children: [jsx("input", {
-      placeholder: "Ask AI to update your email\u2026",
-      value: input,
-      onChange: e => setInput(e.target.value),
-      disabled: busy,
+    children: [jsxs("div", {
       style: {
-        flex: 1,
-        padding: 8,
-        border: '1px solid #cbd5e1',
-        borderRadius: 8
-      }
-    }), jsx("button", {
-      disabled: busy,
-      style: {
-        padding: '8px 12px',
-        borderRadius: 8,
-        border: '1px solid #0ea5e9',
-        background: '#0ea5e9',
-        color: '#fff'
+        overflow: 'auto'
       },
-      children: busy ? 'Thinking…' : 'Send'
+      className: "neb-chat-list",
+      ref: listRef,
+      children: [messages.length === 0 && jsx("div", {
+        style: {
+          color: 'var(--subtle)',
+          fontSize: 13
+        },
+        children: "Tip: Try \u201CCreate a promo email for a summer sale with a big hero image, 2 columns of features, and a CTA button. Branded blue.\u201D"
+      }), messages.map((m, i) => jsx("div", {
+        className: `neb-chat-msg ${m.role}`,
+        children: m.content
+      }, i))]
+    }), jsxs("form", {
+      onSubmit: onSubmit,
+      style: {
+        display: 'flex',
+        gap: 8
+      },
+      children: [jsx("input", {
+        placeholder: "Ask AI to create or edit your email\u2026",
+        value: input,
+        onChange: e => setInput(e.target.value),
+        disabled: busy,
+        className: "neb-input",
+        style: {
+          flex: 1
+        }
+      }), jsx("button", {
+        disabled: busy,
+        className: "neb-btn primary",
+        children: busy ? 'Thinking…' : 'Send'
+      })]
     })]
   });
 };
@@ -1384,6 +1608,58 @@ const DesktopIcon = ({
     strokeWidth: "1.5"
   })]
 });
+const ExpandIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: [jsx("path", {
+    d: "M4 10V4h6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  }), jsx("path", {
+    d: "M20 14v6h-6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  }), jsx("path", {
+    d: "M4 4l6 6M20 20l-6-6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  })]
+});
+const CollapseIcon = ({
+  size = 16
+}) => jsxs("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  xmlns: "http://www.w3.org/2000/svg",
+  "aria-hidden": true,
+  children: [jsx("path", {
+    d: "M10 4H4v6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  }), jsx("path", {
+    d: "M14 20h6v-6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  }), jsx("path", {
+    d: "M4 10l6-6M20 14l-6 6",
+    stroke: "currentColor",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  })]
+});
 const Toolbar = ({
   mode,
   onSetMode,
@@ -1392,7 +1668,9 @@ const Toolbar = ({
   onPreviewWidth,
   onUndo,
   onRedo,
-  activeWidth
+  activeWidth,
+  full,
+  onToggleFull
 }) => {
   const isActiveWidth = w => activeWidth === w;
   return jsxs("div", {
@@ -1472,6 +1750,12 @@ const Toolbar = ({
           title: "Desktop",
           children: jsx(DesktopIcon, {})
         })]
+      }), jsx("button", {
+        className: "neb-btn ghost",
+        title: full ? 'Exit full screen' : 'Full screen',
+        onClick: onToggleFull,
+        "aria-pressed": !!full,
+        children: full ? jsx(CollapseIcon, {}) : jsx(ExpandIcon, {})
       })]
     }), jsxs("div", {
       className: "group",
@@ -1490,24 +1774,38 @@ const Toolbar = ({
 
 const Editor = ({
   initial,
+  initialHtml,
+  initialJson,
+  value,
   chatAdapter,
-  onChange
+  onChange,
+  onHtmlChange,
+  onJsonChange
 }) => {
-  const [root, setRoot] = useState(() => initial !== null && initial !== void 0 ? initial : createSection({}, [createColumn({}, [createText({
-    content: 'Hello'
-  }), createSpacer(), createButton()])]));
+  const [root, setRoot] = useState(() => {
+    if (value) return value;
+    if (initialHtml) return parseHtmlToTree(initialHtml);
+    if (initialJson) return initialJson;
+    return initial !== null && initial !== void 0 ? initial : createSection({}, [createColumn({}, [createText({
+      content: 'Hello'
+    }), createSpacer(), createButton()])]);
+  });
   const [selectedId, setSelectedId] = useState(root.id);
   const [mode, setMode] = useState('edit');
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
-  const selected = useMemo(() => selectedId ? findNode(root, selectedId) : undefined, [root, selectedId]);
+  const tree = value !== null && value !== void 0 ? value : root;
+  const selected = useMemo(() => selectedId ? findNode(tree, selectedId) : undefined, [tree, selectedId]);
   function emit(next, pushHistory = true) {
     if (pushHistory) {
       setUndoStack(s => [...s, root]);
       setRedoStack([]);
     }
-    setRoot(next);
+    if (!value) setRoot(next);
+    const html = renderToHtml(next);
     onChange === null || onChange === void 0 ? void 0 : onChange(next);
+    onJsonChange === null || onJsonChange === void 0 ? void 0 : onJsonChange(next);
+    onHtmlChange === null || onHtmlChange === void 0 ? void 0 : onHtmlChange(html);
   }
   function undo() {
     setUndoStack(s => {
@@ -1545,16 +1843,16 @@ const Editor = ({
       }
       return undefined;
     }
-    const info = walk(root);
+    const info = walk(tree);
     if ((info === null || info === void 0 ? void 0 : info.parent) && info.index !== undefined) {
-      emit(insertNode(root, info.parent.id, node, info.index + 1));
+      emit(insertNode(tree, info.parent.id, node, info.index + 1));
     } else {
       // If not found as a sibling, append to root
-      emit(insertNode(root, root.id, node));
+      emit(insertNode(tree, tree.id, node));
     }
   }
   function applyActions(actions) {
-    let current = root;
+    let current = tree;
     for (const a of actions) {
       switch (a.type) {
         case 'insert':
@@ -1568,6 +1866,9 @@ const Editor = ({
           break;
         case 'select':
           setSelectedId(a.id);
+          break;
+        case 'replace':
+          current = a.root;
           break;
       }
     }
@@ -1624,10 +1925,11 @@ const Editor = ({
     }
   };
   const [stageWidth, setStageWidth] = useState(600);
-  const html = useMemo(() => renderToHtml(root), [root]);
+  const [isFull, setIsFull] = useState(false);
+  const html = useMemo(() => renderToHtml(value !== null && value !== void 0 ? value : root), [value, root]);
   // Templates removed; left panel hosts Chat instead
   return jsxs("div", {
-    className: "neb neb-reset neb-app",
+    className: `neb neb-reset neb-app ${isFull ? 'neb-full' : ''}`,
     style: {
       ['--stage-width']: `${stageWidth}px`
     },
@@ -1654,11 +1956,13 @@ const Editor = ({
       onPreviewWidth: w => setStageWidth(w),
       activeWidth: stageWidth,
       onUndo: undo,
-      onRedo: redo
+      onRedo: redo,
+      full: isFull,
+      onToggleFull: () => setIsFull(v => !v)
     }), jsxs("div", {
       className: "neb-shell",
       style: {
-        gridTemplateColumns: '320px 1fr 340px'
+        gridTemplateColumns: isFull ? '0 1fr 0' : '320px 1fr 340px'
       },
       children: [jsxs("div", {
         className: "neb-panel",
@@ -1691,7 +1995,7 @@ const Editor = ({
           })
         })]
       }), jsxs("div", {
-        className: "neb-panel",
+        className: "neb-panel neb-center",
         children: [jsxs("div", {
           className: "header",
           style: {
@@ -1717,19 +2021,16 @@ const Editor = ({
           })]
         }), jsx("div", {
           className: "body",
-          style: {
-            display: 'grid'
-          },
           children: jsx(Canvas, {
-            root: root,
+            root: value !== null && value !== void 0 ? value : root,
             onSelect: setSelectedId,
             selectedId: selectedId,
-            onMoveUp: id => emit(moveSibling(root, id, -1)),
-            onMoveDown: id => emit(moveSibling(root, id, 1)),
-            onRemove: id => emit(removeNode(root, id)),
+            onMoveUp: id => emit(moveSibling(value !== null && value !== void 0 ? value : root, id, -1)),
+            onMoveDown: id => emit(moveSibling(value !== null && value !== void 0 ? value : root, id, 1)),
+            onRemove: id => emit(removeNode(value !== null && value !== void 0 ? value : root, id)),
             mode: mode,
             factories: factories,
-            onInsertAt: (parentId, node, index) => emit(insertNode(root, parentId, node, index)),
+            onInsertAt: (parentId, node, index) => emit(insertNode(value !== null && value !== void 0 ? value : root, parentId, node, index)),
             onInsertAfter: (id, n) => insertAfter(id, n)
           })
         })]
@@ -1742,13 +2043,186 @@ const Editor = ({
           className: "body",
           children: jsx(Inspector, {
             node: selected,
-            onChange: patch => selected && emit(updateNode(root, selected.id, patch))
+            onChange: patch => selected && emit(updateNode(value !== null && value !== void 0 ? value : root, selected.id, patch))
           })
         })]
       })]
     })]
   });
 };
+
+function createOpenAIAdapter(cfg, seedSystem) {
+  var _a;
+  const baseURL = (_a = cfg.baseURL) !== null && _a !== void 0 ? _a : 'https://api.openai.com/v1';
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${cfg.apiKey}`
+  };
+  const system = seedSystem !== null && seedSystem !== void 0 ? seedSystem : `You are an email layout assistant. Input: current email JSON tree and a user request. Output: ONLY a JSON object with an "actions" array. Do not include any prose.
+
+Schema:
+{
+  "actions": [
+    {"type":"insert","parentId":"...","index":0,"node":{"type":"text|image|button|spacer|column|section","id?":"string","props":{},"children?":[]}},
+    {"type":"update","id":"...","props":{}},
+    {"type":"remove","id":"..."},
+    {"type":"select","id":"..."},
+    {"type":"replace","root": {"type":"section","id?":"string","props":{},"children":[]}}
+  ]
+}
+
+Rules:
+- Use only these block types: section, column, text, image, button, spacer.
+- Provide a single section root for replace.
+- ids are optional; they will be auto-generated.
+- When user asks to create a template from scratch, return a single replace with a full tree.
+- No extra keys, no markdown fences.`;
+  async function call(messages) {
+    var _a, _b, _c, _d;
+    const res = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: cfg.model,
+        messages,
+        temperature: 0,
+        response_format: {
+          type: 'json_object'
+        }
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenAI error ${res.status}: ${text}`);
+    }
+    const json = await res.json();
+    const content = (_d = (_c = (_b = (_a = json.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) !== null && _d !== void 0 ? _d : '{"actions":[]}';
+    return content;
+  }
+  return {
+    async send({
+      root,
+      message
+    }) {
+      var _a, _b, _c;
+      const prompt = `Current email JSON: ${JSON.stringify(root)}\nUser request: ${message}\nReturn ONLY a JSON object with an actions array.`;
+      const reply = await call([{
+        role: 'system',
+        content: system
+      }, {
+        role: 'user',
+        content: prompt
+      }]);
+      // Robust parse: accept object { actions: [...] } or extract JSON from fences
+      const tryParse = text => {
+        let t = text.trim();
+        // strip code fences if present
+        const fence = t.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+        if (fence) t = fence[1].trim();
+        // if it looks like an array, wrap it
+        if (t.startsWith('[')) t = `{"actions": ${t}}`;
+        try {
+          return JSON.parse(t);
+        } catch {}
+        // last resort: substring between first { and last }
+        const first = t.indexOf('{');
+        const last = t.lastIndexOf('}');
+        if (first >= 0 && last > first) {
+          try {
+            return JSON.parse(t.slice(first, last + 1));
+          } catch {}
+        }
+        return null;
+      };
+      let parsed = tryParse(reply);
+      let actions = Array.isArray(parsed === null || parsed === void 0 ? void 0 : parsed.actions) ? parsed.actions : Array.isArray(parsed) ? parsed : [];
+      // Sanitize: ensure nodes have ids recursively
+      const ensureIds = node => {
+        var _a, _b, _c;
+        return {
+          id: (_a = node.id) !== null && _a !== void 0 ? _a : uid(),
+          type: node.type,
+          props: (_b = node.props) !== null && _b !== void 0 ? _b : {},
+          children: (_c = node.children) === null || _c === void 0 ? void 0 : _c.map(ensureIds)
+        };
+      };
+      let clean = actions.flatMap(a => {
+        if (!a || typeof a !== 'object' || typeof a.type !== 'string') return [];
+        if (a.type === 'insert' && a.node) return [{
+          ...a,
+          node: ensureIds(a.node)
+        }];
+        if (a.type === 'replace' && a.root) return [{
+          ...a,
+          root: ensureIds(a.root)
+        }];
+        if (a.type === 'update' && a.id) return [a];
+        if (a.type === 'remove' && a.id) return [a];
+        if (a.type === 'select') return [a];
+        return [];
+      });
+      // Fallback: if user intent indicates creation and model returned nothing, ask once more with stricter instruction
+      if (clean.length === 0 && /\b(create|generate|make|build)\b/i.test(message)) {
+        const stricter = `User requested to CREATE a new marketing email template. Return exactly one replace action with a compelling layout: hero headline, supporting body text, primary CTA, tasteful spacing, and brand-consistent colors. JSON only.
+{"actions":[{"type":"replace","root":{"type":"section","props":{"backgroundColor":"#ffffff","padding":"24px 24px"},"children":[{"type":"column","props":{"width":"100%","padding":"0px"},"children":[{"type":"text","props":{"content":"Welcome to Our Marketing Email!","align":"center","color":"#0f172a","fontSize":"22px","lineHeight":"1.5"}},{"type":"spacer","props":{"height":"12px"}},{"type":"text","props":{"content":"Discover our latest products and offers.","align":"center","color":"#475569","fontSize":"14px","lineHeight":"1.6"}},{"type":"spacer","props":{"height":"20px"}},{"type":"button","props":{"label":"Shop Now","href":"#","backgroundColor":"#0f172a","color":"#ffffff","padding":"12px 18px","borderRadius":"6px"}}]}]}}]}`;
+        const second = await call([{
+          role: 'system',
+          content: system
+        }, {
+          role: 'user',
+          content: stricter
+        }]);
+        parsed = tryParse(second);
+        actions = Array.isArray(parsed === null || parsed === void 0 ? void 0 : parsed.actions) ? parsed.actions : Array.isArray(parsed) ? parsed : [];
+        clean = actions.flatMap(a => {
+          if (!a || typeof a !== 'object' || typeof a.type !== 'string') return [];
+          if (a.type === 'replace' && a.root) return [{
+            ...a,
+            root: ensureIds(a.root)
+          }];
+          return [];
+        });
+      }
+      const summary = (() => {
+        if (clean.find(a => a.type === 'replace')) return 'Created a complete marketing email template.';
+        const counts = clean.reduce((m, a) => {
+          var _a;
+          return m[a.type] = ((_a = m[a.type]) !== null && _a !== void 0 ? _a : 0) + 1, m;
+        }, {});
+        const parts = Object.entries(counts).map(([t, n]) => `${n} ${t}`);
+        return parts.length ? `Applied: ${parts.join(', ')}.` : 'No changes.';
+      })();
+      // If we still have no actions and the prompt looks conversational, return a natural reply
+      let replyText = undefined;
+      if (clean.length === 0 && /\b(hi|hello|hey|who are you|what can you do|help)\b/i.test(message)) {
+        const conv = await fetch(`${baseURL}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [{
+              role: 'system',
+              content: 'You are a helpful email design assistant. Answer briefly and politely.'
+            }, {
+              role: 'user',
+              content: message
+            }],
+            temperature: 0.5
+          })
+        });
+        if (conv.ok) {
+          const j = await conv.json();
+          replyText = (_c = (_b = (_a = j.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content;
+        }
+      }
+      return {
+        actions: clean,
+        summary,
+        reply: replyText
+      };
+    }
+  };
+}
 
 const Sidebar = ({
   templates,
@@ -1770,5 +2244,5 @@ const Sidebar = ({
   });
 };
 
-export { Editor, Sidebar, Toolbar, createButton, createColumn, createImage, createSection, createSpacer, createText, findNode, findParent, insertNode, moveNode, moveSibling, removeNode, renderToHtml, uid, updateNode };
+export { Editor, Sidebar, Toolbar, createButton, createColumn, createImage, createOpenAIAdapter, createSection, createSpacer, createText, findNode, findParent, insertNode, moveNode, moveSibling, parseHtmlToTree, removeNode, renderToHtml, uid, updateNode };
 //# sourceMappingURL=index.mjs.map

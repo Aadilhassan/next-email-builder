@@ -9,6 +9,8 @@ type Props = {
   onUndo: () => void;
   onRedo: () => void;
   activeWidth?: number;
+  full?: boolean;
+  onToggleFull?: () => void;
 };
 
 const PencilIcon = ({ size = 16 }: { size?: number }) => (
@@ -47,7 +49,22 @@ const DesktopIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-export const Toolbar: React.FC<Props> = ({ mode, onSetMode, onCopyHtml, onExportHtml, onPreviewWidth, onUndo, onRedo, activeWidth }) => {
+const ExpandIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    <path d="M4 10V4h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    <path d="M20 14v6h-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    <path d="M4 4l6 6M20 20l-6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+  </svg>
+);
+const CollapseIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    <path d="M10 4H4v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    <path d="M14 20h6v-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    <path d="M4 10l6-6M20 14l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+  </svg>
+);
+
+export const Toolbar: React.FC<Props> = ({ mode, onSetMode, onCopyHtml, onExportHtml, onPreviewWidth, onUndo, onRedo, activeWidth, full, onToggleFull }) => {
   const isActiveWidth = (w: number) => activeWidth === w;
   return (
     <div className="neb neb-toolbar">
@@ -109,6 +126,9 @@ export const Toolbar: React.FC<Props> = ({ mode, onSetMode, onCopyHtml, onExport
             <DesktopIcon />
           </button>
         </div>
+        <button className="neb-btn ghost" title={full ? 'Exit full screen' : 'Full screen'} onClick={onToggleFull} aria-pressed={!!full}>
+          {full ? <CollapseIcon /> : <ExpandIcon />}
+        </button>
       </div>
       <div className="group">
         <button className="neb-btn" onClick={onCopyHtml}>Copy HTML</button>

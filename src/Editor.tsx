@@ -7,29 +7,51 @@ import { Toolbar } from './components/Toolbar';
 import { EmailNode } from './types';
 import { createButton, createColumn, createImage, createSection, createSpacer, createText, findNode, insertNode, removeNode, updateNode, moveSibling } from './core';
 import { renderToHtml } from './renderers/html';
+import { parseHtmlToTree } from './parsers/htmlToTree';
 
 export type EditorProps = {
+  /** Provide initial tree. If omitted, a default section/column is created. */
   initial?: EmailNode;
+  /** Provide raw HTML to initialize the editor. Overrides `initial` when present. */
+  initialHtml?: string;
+  /** Provide a JSON tree to initialize the editor (same shape as EmailNode). Overrides `initial` when present. */
+  initialJson?: EmailNode;
+  /** Controlled value: when provided, the editor renders this tree and becomes controlled. */
+  value?: EmailNode;
   chatAdapter?: ChatAdapter;
+  /** Fires on any change with the JSON tree. */
   onChange?: (root: EmailNode) => void;
+  /** Fires on any change with fresh rendered HTML. */
+  onHtmlChange?: (html: string) => void;
+  /** Fires on any change with the JSON tree (alias for onChange, useful when passing both). */
+  onJsonChange?: (root: EmailNode) => void;
 };
 
-export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }) => {
-  const [root, setRoot] = useState<EmailNode>(() => initial ?? createSection({}, [createColumn({}, [createText({ content: 'Hello' }), createSpacer(), createButton()])]))
+export const Editor: React.FC<EditorProps> = ({ initial, initialHtml, initialJson, value, chatAdapter, onChange, onHtmlChange, onJsonChange }) => {
+  const [root, setRoot] = useState<EmailNode>(() => {
+    if (value) return value;
+    if (initialHtml) return parseHtmlToTree(initialHtml);
+    if (initialJson) return initialJson;
+    return initial ?? createSection({}, [createColumn({}, [createText({ content: 'Hello' }), createSpacer(), createButton()])]);
+  })
   const [selectedId, setSelectedId] = useState<string | undefined>(root.id);
   const [mode, setMode] = useState<'edit' | 'preview'>('edit');
   const [undoStack, setUndoStack] = useState<EmailNode[]>([]);
   const [redoStack, setRedoStack] = useState<EmailNode[]>([]);
 
-  const selected = useMemo(() => (selectedId ? findNode(root, selectedId) : undefined), [root, selectedId]);
+  const tree = value ?? root;
+  const selected = useMemo(() => (selectedId ? findNode(tree, selectedId) : undefined), [tree, selectedId]);
 
   function emit(next: EmailNode, pushHistory: boolean = true) {
     if (pushHistory) {
       setUndoStack((s) => [...s, root]);
       setRedoStack([]);
     }
-    setRoot(next);
+    if (!value) setRoot(next);
+    const html = renderToHtml(next);
     onChange?.(next);
+    onJsonChange?.(next);
+    onHtmlChange?.(html);
   }
 
   function undo() {
@@ -55,8 +77,8 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
   }
 
   function add(node: EmailNode) {
-    const parentId = selectedId ?? root.id;
-    emit(insertNode(root, parentId, node));
+    const parentId = selectedId ?? tree.id;
+    emit(insertNode(tree, parentId, node));
   }
 
   function insertAfter(targetId: string, node: EmailNode) {
@@ -72,17 +94,17 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
       }
       return undefined;
     }
-    const info = walk(root);
+    const info = walk(tree);
     if (info?.parent && info.index !== undefined) {
-      emit(insertNode(root, info.parent.id, node, info.index + 1));
+      emit(insertNode(tree, info.parent.id, node, info.index + 1));
     } else {
       // If not found as a sibling, append to root
-      emit(insertNode(root, root.id, node));
+      emit(insertNode(tree, tree.id, node));
     }
   }
 
   function applyActions(actions: Array<{ type: string; [k: string]: any }>) {
-    let current = root;
+  let current = tree;
     for (const a of actions) {
       switch (a.type) {
         case 'insert':
@@ -135,12 +157,13 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
   };
 
   const [stageWidth, setStageWidth] = useState(600);
-  const html = useMemo(() => renderToHtml(root), [root]);
+  const [isFull, setIsFull] = useState(false);
+  const html = useMemo(() => renderToHtml(value ?? root), [value, root]);
 
   // Templates removed; left panel hosts Chat instead
 
   return (
-    <div className="neb neb-reset neb-app" style={{ ['--stage-width' as any]: `${stageWidth}px` }}>
+    <div className={`neb neb-reset neb-app ${isFull ? 'neb-full' : ''}`} style={{ ['--stage-width' as any]: `${stageWidth}px` }}>
       <Toolbar
         mode={mode}
         onSetMode={setMode}
@@ -160,8 +183,10 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
         activeWidth={stageWidth}
         onUndo={undo}
         onRedo={redo}
+        full={isFull}
+        onToggleFull={() => setIsFull((v) => !v)}
       />
-      <div className="neb-shell" style={{ gridTemplateColumns: '320px 1fr 340px' }}>
+      <div className="neb-shell" style={{ gridTemplateColumns: isFull ? '0 1fr 0' : '320px 1fr 340px' }}>
         <div className="neb-panel">
           <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="neb-badges"><span className="neb-badge">AI</span></div>
@@ -173,7 +198,7 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
             )}
           </div>
         </div>
-        <div className="neb-panel">
+        <div className="neb-panel neb-center">
           <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="neb-badges">
               <span className="neb-badge">Width {stageWidth}px</span>
@@ -183,17 +208,17 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
               <span className="neb-badge">Blocks</span>
             </div>
           </div>
-          <div className="body" style={{ display: 'grid' }}>
+          <div className="body">
             <Canvas
-              root={root}
+              root={value ?? root}
               onSelect={setSelectedId}
               selectedId={selectedId}
-              onMoveUp={(id) => emit(moveSibling(root, id, -1))}
-              onMoveDown={(id) => emit(moveSibling(root, id, +1))}
-              onRemove={(id) => emit(removeNode(root, id))}
+              onMoveUp={(id) => emit(moveSibling(value ?? root, id, -1))}
+              onMoveDown={(id) => emit(moveSibling(value ?? root, id, +1))}
+              onRemove={(id) => emit(removeNode(value ?? root, id))}
               mode={mode}
               factories={factories as any}
-              onInsertAt={(parentId, node, index) => emit(insertNode(root, parentId, node, index))}
+              onInsertAt={(parentId, node, index) => emit(insertNode(value ?? root, parentId, node, index))}
               onInsertAfter={(id, n) => insertAfter(id, n)}
             />
           </div>
@@ -202,7 +227,7 @@ export const Editor: React.FC<EditorProps> = ({ initial, chatAdapter, onChange }
         <div className="neb-panel neb-inspector">
           <div className="header">Inspect</div>
           <div className="body">
-            <Inspector node={selected} onChange={(patch) => selected && emit(updateNode(root, selected.id, patch))} />
+            <Inspector node={selected} onChange={(patch) => selected && emit(updateNode(value ?? root, selected.id, patch))} />
           </div>
         </div>
       </div>

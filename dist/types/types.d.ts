@@ -61,5 +61,8 @@ export type AssistantAction = {
 } | {
     type: 'select';
     id?: NodeId;
+} | {
+    type: 'replace';
+    root: EmailNode;
 };
 //# sourceMappingURL=types.d.ts.map

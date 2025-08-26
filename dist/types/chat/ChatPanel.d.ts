@@ -4,7 +4,11 @@ export interface ChatAdapter {
     send: (ctx: {
         root: EmailNode;
         message: string;
-    }) => Promise<AssistantAction[]>;
+    }) => Promise<AssistantAction[] | {
+        actions: AssistantAction[];
+        summary?: string;
+        reply?: string;
+    }>;
 }
 type Props = {
     root: EmailNode;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AssistantAction, EmailNode } from '../types';
 
 export interface ChatAdapter {
@@ -18,6 +18,14 @@ export const ChatPanel: React.FC<Props> = ({ root, onActions, adapter }) => {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, busy]);
 
   function summarize(actions: AssistantAction[]): string {
     if (!actions.length) return 'No changes.';
@@ -57,21 +65,14 @@ export const ChatPanel: React.FC<Props> = ({ root, onActions, adapter }) => {
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 8, height: '100%' }}>
-      <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
+      <div style={{ overflow: 'auto' }} className="neb-chat-list" ref={listRef}>
         {messages.length === 0 && (
           <div style={{ color: 'var(--subtle)', fontSize: 13 }}>
             Tip: Try “Create a promo email for a summer sale with a big hero image, 2 columns of features, and a CTA button. Branded blue.”
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} style={{
-            justifySelf: m.role === 'user' ? 'end' : 'start',
-            background: m.role === 'user' ? 'var(--accent)' : 'var(--muted)',
-            color: m.role === 'user' ? '#fff' : 'var(--text)',
-            padding: '8px 10px', borderRadius: 10, maxWidth: '80%'
-          }}>
-            {m.content}
-          </div>
+          <div key={i} className={`neb-chat-msg ${m.role}`}>{m.content}</div>
         ))}
       </div>
       <form onSubmit={onSubmit} style={{ display: 'flex', gap: 8 }}>

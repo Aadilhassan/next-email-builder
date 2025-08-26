@@ -127,11 +127,12 @@ export const Canvas: React.FC<Props> = ({ root, onSelect, selectedId, onMoveUp, 
           <div className="neb-add-wrap" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              className="neb-add-btn"
+              className="neb-add-btn "
               title="Add block"
+              style={{ color: '#fff' }}
               onClick={() => setPickerFor((p) => (p === node.id ? undefined : node.id))}
             >
-              <PlusIcon />
+              <PlusIcon  />
             </button>
             {showPicker && (
               <div className="neb-picker-wrap">
