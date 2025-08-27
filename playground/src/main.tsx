@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Editor, createOpenAIAdapter, parseHtmlToTree, type EmailNode } from 'next-email-builder';
-import '../../src/styles.css';
+// import '../../src/styles.css';
 
 const apiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY as string | undefined;
 const model = ((import.meta as any).env?.VITE_OPENAI_MODEL as string | undefined) ?? 'gpt-4o-mini';

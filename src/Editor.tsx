@@ -8,6 +8,7 @@ import { EmailNode } from './types';
 import { createButton, createColumn, createImage, createSection, createSpacer, createText, findNode, insertNode, removeNode, updateNode, moveSibling } from './core';
 import { renderToHtml } from './renderers/html';
 import { parseHtmlToTree } from './parsers/htmlToTree';
+import "./styles.css"
 
 export type EditorProps = {
   /** Provide initial tree. If omitted, a default section/column is created. */
